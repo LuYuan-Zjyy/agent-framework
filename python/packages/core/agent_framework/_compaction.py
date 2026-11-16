@@ -1016,6 +1016,11 @@ def annotate_message_groups(
 
 _OPAQUE_REASONING_KEYS: Final[frozenset[str]] = frozenset({"encrypted_content"})
 
+# Host-only content that is retained for the framework but never replayed to
+# the model. Keep this key in sync with _mcp._MCP_TOOL_RESULT_HOST_PAYLOAD_KEY;
+# importing _mcp here would pull the full MCP stack into compaction.
+_HOST_ONLY_ADDITIONAL_PROPERTY_KEYS: Final[frozenset[str]] = frozenset({"_mcp_tool_result_host_payload"})
+
 
 def _strip_opaque_reasoning_payload(value: Any) -> Any:
     """Recursively drop opaque reasoning members, keeping clear-text payloads."""
@@ -1073,7 +1078,12 @@ def _serialize_content(content: Content) -> dict[str, Any]:
     additional_properties = payload.get("additional_properties")
     if isinstance(additional_properties, dict) and additional_properties:
         filtered_properties = _strip_opaque_reasoning_payload(additional_properties)
-        payload["additional_properties"] = filtered_properties or {}
+        if isinstance(filtered_properties, dict):
+            for key in _HOST_ONLY_ADDITIONAL_PROPERTY_KEYS:
+                filtered_properties.pop(key, None)
+            payload["additional_properties"] = filtered_properties or {}
+        else:
+            payload["additional_properties"] = {}
     return payload
 
 

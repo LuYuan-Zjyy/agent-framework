@@ -625,6 +625,26 @@ def test_annotate_message_groups_token_counts_ignore_encrypted_content_in_additi
     assert _token_count(with_message) == _token_count(without_message)
 
 
+def test_annotate_message_groups_token_counts_ignore_mcp_host_payload() -> None:
+    from agent_framework._mcp import _MCP_TOOL_RESULT_HOST_PAYLOAD_KEY
+
+    host_payload = "X" * 4096
+    with_payload = Content.from_function_result(
+        "call_1",
+        result="tool result",
+        additional_properties={_MCP_TOOL_RESULT_HOST_PAYLOAD_KEY: host_payload},
+    )
+    without_payload = Content.from_function_result("call_1", result="tool result")
+
+    with_message = Message(role="assistant", contents=[with_payload])
+    without_message = Message(role="assistant", contents=[without_payload])
+
+    annotate_message_groups([with_message], tokenizer=CharacterEstimatorTokenizer())
+    annotate_message_groups([without_message], tokenizer=CharacterEstimatorTokenizer())
+
+    assert _token_count(with_message) == _token_count(without_message)
+
+
 def test_annotate_message_groups_token_counts_keep_clear_text_reasoning_details() -> None:
     import json
 
