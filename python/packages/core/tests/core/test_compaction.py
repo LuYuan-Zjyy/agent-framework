@@ -626,7 +626,11 @@ def test_annotate_message_groups_token_counts_ignore_encrypted_content_in_additi
 
 
 def test_annotate_message_groups_token_counts_ignore_mcp_host_payload() -> None:
+    from agent_framework._compaction import _HOST_ONLY_ADDITIONAL_PROPERTY_KEYS
     from agent_framework._mcp import _MCP_TOOL_RESULT_HOST_PAYLOAD_KEY
+
+    # Guard against drift: the strip key must stay in sync with _mcp.
+    assert {_MCP_TOOL_RESULT_HOST_PAYLOAD_KEY} == _HOST_ONLY_ADDITIONAL_PROPERTY_KEYS
 
     host_payload = "X" * 4096
     with_payload = Content.from_function_result(
@@ -643,6 +647,7 @@ def test_annotate_message_groups_token_counts_ignore_mcp_host_payload() -> None:
     annotate_message_groups([without_message], tokenizer=CharacterEstimatorTokenizer())
 
     assert _token_count(with_message) == _token_count(without_message)
+    assert _MCP_TOOL_RESULT_HOST_PAYLOAD_KEY not in _serialize_message(with_message)
 
 
 def test_annotate_message_groups_token_counts_keep_clear_text_reasoning_details() -> None:
@@ -701,6 +706,34 @@ def test_annotate_token_counts_recomputes_counts_from_stale_serialization_basis(
     annotation = message.additional_properties[GROUP_ANNOTATION_KEY]
     assert isinstance(annotation, dict)
     assert annotation[GROUP_TOKEN_COUNT_KEY] != 1
+    assert annotation["token_count_basis"] == TOKEN_COUNT_BASIS_VERSION
+
+
+def test_annotate_token_counts_recomputes_mcp_host_payload_counts_from_older_basis() -> None:
+    from agent_framework._compaction import TOKEN_COUNT_BASIS_VERSION, _write_group_annotation, annotate_token_counts
+    from agent_framework._mcp import _MCP_TOOL_RESULT_HOST_PAYLOAD_KEY
+
+    host_payload = "X" * 4096
+    content = Content.from_function_result(
+        "call_1",
+        result="tool result",
+        additional_properties={_MCP_TOOL_RESULT_HOST_PAYLOAD_KEY: host_payload},
+    )
+    message = Message(role="assistant", contents=[content])
+    _write_group_annotation(message, group_id="g0", kind="assistant_text", index=0, has_reasoning=False)
+    annotation = message.additional_properties[GROUP_ANNOTATION_KEY]
+    assert isinstance(annotation, dict)
+
+    # Simulate a count cached before this serialization change, when the host
+    # payload was still included in the token estimate.
+    annotation[GROUP_TOKEN_COUNT_KEY] = 999_999
+    annotation["token_count_basis"] = TOKEN_COUNT_BASIS_VERSION - 1
+
+    annotate_token_counts([message], tokenizer=CharacterEstimatorTokenizer())
+
+    annotation = message.additional_properties[GROUP_ANNOTATION_KEY]
+    assert isinstance(annotation, dict)
+    assert annotation[GROUP_TOKEN_COUNT_KEY] < 999_999
     assert annotation["token_count_basis"] == TOKEN_COUNT_BASIS_VERSION
 
 

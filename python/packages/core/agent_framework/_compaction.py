@@ -44,7 +44,7 @@ GROUP_TOKEN_COUNT_BASIS_KEY = "token_count_basis"  # ruff:ignore[hardcoded-passw
 # stamped with an older basis are recomputed instead of reused: annotations
 # survive Message.to_dict()/from_dict() round-trips, so without the basis a
 # transcript annotated before a serialization change keeps its stale counts.
-TOKEN_COUNT_BASIS_VERSION = 2
+TOKEN_COUNT_BASIS_VERSION = 3
 EXCLUDED_KEY = "_excluded"
 EXCLUDE_REASON_KEY = "_exclude_reason"
 SUMMARY_OF_MESSAGE_IDS_KEY = "_summary_of_message_ids"
